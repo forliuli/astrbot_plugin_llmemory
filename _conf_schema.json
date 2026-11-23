@@ -1,0 +1,273 @@
+{
+  "enable": {
+    "description": "情绪模块",
+    "type": "bool",
+    "default": true,
+    "hint": "总开关。关掉以后六维不再变，写进提示词的那句话也一起撤掉。"
+  },
+  "judge_mode": {
+    "description": "怎么判断你说的话",
+    "type": "string",
+    "default": "rule",
+    "options": [
+      {
+        "label": "查词表（本地，不花钱）",
+        "value": "rule"
+      },
+      {
+        "label": "调模型（准一些，要填接口）",
+        "value": "model"
+      },
+      {
+        "label": "不判断，只让它自然回落",
+        "value": "off"
+      }
+    ],
+    "hint": "查词表立刻能用，反讽会判错。调模型要下面三格填全，填不全会自动退回查词表。"
+  },
+  "model_url": {
+    "description": "模型地址",
+    "type": "string",
+    "default": "",
+    "hint": "能返回 JSON 的对话接口，比如 https://api.xxx.com/v1/chat/completions"
+  },
+  "model_key": {
+    "description": "模型密钥",
+    "type": "string",
+    "default": "",
+    "hint": "只存在这台机器上。"
+  },
+  "model_name": {
+    "description": "模型名",
+    "type": "string",
+    "default": "",
+    "hint": "比如 gpt-4o-mini、qwen-plus。"
+  },
+  "vec_model_urls": {
+    "description": "向量模型 · 下载地址",
+    "type": "string",
+    "default": "https://hf-mirror.com/Xenova/bge-small-zh-v1.5/resolve/main/onnx/model.onnx,https://modelscope.cn/models/Xenova/bge-small-zh-v1.5/resolve/master/onnx/model.onnx",
+    "hint": "向量模型（bge-small-zh-v1.5 ONNX，约 90MB）的下载地址，按顺序试，换行或逗号分隔。留空则跳过向量层，只用时间窗检索。"
+  },
+  "vec_model_sha256": {
+    "description": "向量模型 · 校验值",
+    "type": "string",
+    "default": "69a0b846f4f116b5e6aabf9546ea6754d02264f3211a13a1bd69b31b8040749a",
+    "hint": "填了就会比对 sha256，对不上丢掉重下。留空只核长度。"
+  },
+  "affect_tone": {
+    "description": "让心情影响说话",
+    "type": "bool",
+    "default": true,
+    "hint": "亲密高一点会黏，压力高一点会短。"
+  },
+  "affect_recall": {
+    "description": "让心情影响想起来的记忆",
+    "type": "bool",
+    "default": false,
+    "hint": "心情沉的时候偏向想起沉的旧事。默认关着，觉得合适再开。"
+  },
+  "decay_enable": {
+    "description": "记忆边 · 按时间压一压",
+    "type": "bool",
+    "default": true,
+    "hint": "老得没人再碰的边慢慢变细，常走的边不动。只降不删，压到底线就停。"
+  },
+  "decay_every_hours": {
+    "description": "记忆边 · 几个钟头压一次",
+    "type": "int",
+    "default": 4,
+    "hint": "默认四小时。"
+  },
+  "decay_tau_days": {
+    "description": "记忆边 · 多少天细一半",
+    "type": "float",
+    "default": 30.0,
+    "hint": "接到 32 条以上的枢纽边不动。觉得忘得太快就往上调。"
+  },
+  "reflect_enable": {
+    "description": "反思 · 事后回看那几句",
+    "type": "bool",
+    "default": false,
+    "hint": "隔几个钟头把新落的几句话重看一遍，能并成一句的才落成一颗「反思」节点。借用上面那个模型的配置。"
+  },
+  "reflect_every_hours": {
+    "description": "反思 · 几个钟头看一回",
+    "type": "int",
+    "default": 6,
+    "hint": "默认六小时。头一轮也等满这个间隔。"
+  },
+  "adv_base_drive": {
+    "description": "进阶 · 干劲的基线",
+    "type": "float",
+    "default": 40.0,
+    "hint": "0 到 100。什么都不发生的时候会慢慢回到这个数。"
+  },
+  "adv_base_stable": {
+    "description": "进阶 · 稳当的基线",
+    "type": "float",
+    "default": 50.0
+  },
+  "adv_base_focus": {
+    "description": "进阶 · 专注的基线",
+    "type": "float",
+    "default": 50.0
+  },
+  "adv_base_close": {
+    "description": "进阶 · 亲密的基线",
+    "type": "float",
+    "default": 20.0,
+    "hint": "刚装上是 20，贴着一天天往上长。"
+  },
+  "adv_base_relax": {
+    "description": "进阶 · 松弛的基线",
+    "type": "float",
+    "default": 50.0
+  },
+  "adv_base_comfort": {
+    "description": "进阶 · 舒服的基线",
+    "type": "float",
+    "default": 40.0
+  },
+  "adv_decay_speed": {
+    "description": "进阶 · 回落快慢",
+    "type": "float",
+    "default": 1.0,
+    "hint": "1 是默认。改 2 回得快一倍，改 0.5 拖得久一倍。"
+  },
+  "adv_push_scale": {
+    "description": "进阶 · 一句话的推力",
+    "type": "float",
+    "default": 1.0,
+    "hint": "觉得它一天到晚太激动就往下调，太麻木就往上调。"
+  },
+  "adv_corrupt_speed": {
+    "description": "进阶 · 脏污涨速",
+    "type": "float",
+    "default": 1.0,
+    "hint": "被批、被压会脏，安静待着会洗干净。数值越大越容易积。"
+  },
+  "adv_state_file": {
+    "description": "进阶 · 状态存哪儿",
+    "type": "string",
+    "default": "",
+    "hint": "留空就用插件自己的 data 目录。换了路径等于重新养一个。"
+  },
+  "drift_enable": {
+    "description": "神游",
+    "type": "bool",
+    "default": false,
+    "hint": "没事的时候自己顺着旧事走几步，把路上那几句记下来。只落盘，不当场说话。"
+  },
+  "wake_enable": {
+    "description": "自唤醒",
+    "type": "bool",
+    "default": false,
+    "hint": "从神游记下的那几句里挑一句，自己开口。默认关着，觉得话太少再开。"
+  },
+  "wake_quiet_start": {
+    "description": "静默 · 从几点开始",
+    "type": "int",
+    "default": 1,
+    "hint": "0 到 23。这段时间一句话都不主动说，神游照走。"
+  },
+  "wake_quiet_end": {
+    "description": "静默 · 到几点结束",
+    "type": "int",
+    "default": 7,
+    "hint": "可以比起始小，表示跨零点。"
+  },
+  "wake_per_hour": {
+    "description": "一小时最多几句",
+    "type": "int",
+    "default": 2
+  },
+  "wake_per_day": {
+    "description": "一天最多几句",
+    "type": "int",
+    "default": 6,
+    "hint": "按滚动的二十四小时算，不看日历。"
+  },
+  "wake_min_gap": {
+    "description": "两句之间至少隔多久（秒）",
+    "type": "int",
+    "default": 1800
+  },
+  "wake_fresh_minutes": {
+    "description": "多新的碎片才拿来开口（分钟）",
+    "type": "int",
+    "default": 240
+  },
+  "auto_persona": {
+    "description": "人格 · 每天自己长一版",
+    "type": "bool",
+    "default": false,
+    "hint": "到点自己写一版人格页，在上一版上改，不推倒重写。"
+  },
+  "persona_at": {
+    "description": "人格 · 几点写",
+    "type": "string",
+    "default": "04:10",
+    "hint": "24 小时制，比如 04:10。写空就是随时可写。"
+  },
+  "persona_chars": {
+    "description": "人格 · 写到多少字",
+    "type": "int",
+    "default": 900,
+    "hint": "按正文字数算，超了按句子边界截。别压着上限写。"
+  },
+  "auto_diary": {
+    "description": "日记 · 每天自己写一篇",
+    "type": "bool",
+    "default": false,
+    "hint": "到点自己写当天那篇。一天一篇，重写会先把旧的存进存档。"
+  },
+  "diary_at": {
+    "description": "日记 · 几点写",
+    "type": "string",
+    "default": "22:30",
+    "hint": "24 小时制。写空就是随时可写。"
+  },
+  "diary_chars": {
+    "description": "日记 · 写到多少字",
+    "type": "int",
+    "default": 500,
+    "hint": "按篇算，不是每天累加。短着写比写满好看。"
+  },
+  "auto_profile": {
+    "description": "画像 · 每天重蒸一遍他那一页",
+    "type": "bool",
+    "default": false,
+    "hint": "从当天原话和日记里重写，不滚上一版，免得写成一堆猜测。"
+  },
+  "profile_at": {
+    "description": "画像 · 几点写",
+    "type": "string",
+    "default": "04:20",
+    "hint": "24 小时制。写空就是随时可写。"
+  },
+  "profile_chars": {
+    "description": "画像 · 写到多少字",
+    "type": "int",
+    "default": 600,
+    "hint": "一条一行，超了按句子边界截。"
+  },
+  "data_dir": {
+    "type": "string",
+    "description": "数据目录（插件目录之外）",
+    "default": "",
+    "hint": "节点库、图、状态、心情都落这儿。留空就用插件目录下的 plugin_data——市场升级插件时会被覆盖，库会丢。建议填一个插件目录外的绝对路径。"
+  },
+  "writer_dir": {
+    "description": "人格和日记 · 存在哪",
+    "type": "string",
+    "default": "",
+    "hint": "留空就用插件自己的 plugin_data/memory。里面有 live/、diary/、hot.md、persona.md。"
+  },
+  "writer_provider": {
+    "description": "人格和日记 · 用哪个模型",
+    "type": "string",
+    "default": "",
+    "hint": "填模型服务商的 ID。留空就用最近说话的会话正在用的那个。"
+  }
+}
