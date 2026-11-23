@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 模型不进仓库：九十多兆，走源下。tokenizer.json 只有四百多 K，随包走。
+models/*.onnx
+models/*.part
+models/*.lock
+
+# 跑起来才有的东西，谁装谁的。
+plugin_data/
+*.log
+.venv/
