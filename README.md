@@ -13,7 +13,7 @@ AstrBot 用的记忆插件。不接云端、不用向量数据库、不配任何
 pip install -r requirements.txt
 ```
 
-numpy / onnxruntime / tokenizers。缺了不挡插件加载，只是向量那层关掉，检索退成时间窗。
+numpy / onnxruntime / tokenizers。面板装插件时一般会自动装依赖；没自动装的话，到 `AstrBot/data/plugins/astrbot_plugin_llmemory/` 下面手动跑一遍上面这行。缺了不挡插件加载，只是向量那层关掉，检索退成时间窗。
 3. 重启 AstrBot。首次启动会在后台下向量模型（约 90 MB），下完自己接上。
 
 模型地址面板里能改，默认给了 hf-mirror 和 modelscope 两个镜像，一个不通会试下一个。校验值留着的话会校 sha256，填空就跳过校验。下不下来都不影响使用。
