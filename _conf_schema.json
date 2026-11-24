@@ -3,271 +3,278 @@
     "description": "情绪模块",
     "type": "bool",
     "default": true,
-    "hint": "总开关。关掉以后六维不再变，写进提示词的那句话也一起撤掉。"
+    "hint": "情绪系统总开关。关闭后六种激素水平停止更新，注入 prompt 的情绪语句同时移除。"
   },
   "judge_mode": {
-    "description": "怎么判断你说的话",
+    "description": "判定方式",
     "type": "string",
     "default": "rule",
     "options": [
       {
-        "label": "查词表（本地，不花钱）",
+        "label": "词表匹配（本地，无额外开销）",
         "value": "rule"
       },
       {
-        "label": "调模型（准一些，要填接口）",
+        "label": "模型判定（需配置接口）",
         "value": "model"
       },
       {
-        "label": "不判断，只让它自然回落",
+        "label": "关闭判定（仅自然回落）",
         "value": "off"
       }
     ],
-    "hint": "查词表立刻能用，反讽会判错。调模型要下面三格填全，填不全会自动退回查词表。"
+    "hint": "rule：本地词表匹配，无额外开销，反讽、反问等句式误判率较高。model：调用下方模型配置做语义判定，三项未填全时自动回退到 rule。"
   },
   "model_url": {
-    "description": "模型地址",
+    "description": "模型接口地址",
     "type": "string",
     "default": "",
-    "hint": "能返回 JSON 的对话接口，比如 https://api.xxx.com/v1/chat/completions"
+    "hint": "兼容 OpenAI Chat Completions 的接口，需返回 JSON。示例：https://api.xxx.com/v1/chat/completions"
   },
   "model_key": {
     "description": "模型密钥",
     "type": "string",
     "default": "",
-    "hint": "只存在这台机器上。"
+    "hint": "仅保存在本机配置文件内，不随请求外传。"
   },
   "model_name": {
-    "description": "模型名",
+    "description": "模型标识",
     "type": "string",
     "default": "",
-    "hint": "比如 gpt-4o-mini、qwen-plus。"
+    "hint": "接口要求的模型名，如 gpt-4o-mini、qwen-plus。"
   },
   "vec_model_urls": {
-    "description": "向量模型 · 下载地址",
+    "description": "向量模型下载源",
     "type": "string",
     "default": "https://hf-mirror.com/Xenova/bge-small-zh-v1.5/resolve/main/onnx/model.onnx,https://modelscope.cn/models/Xenova/bge-small-zh-v1.5/resolve/master/onnx/model.onnx",
-    "hint": "向量模型（bge-small-zh-v1.5 ONNX，约 90MB）的下载地址，按顺序试，换行或逗号分隔。留空则跳过向量层，只用时间窗检索。"
+    "hint": "bge-small-zh-v1.5 ONNX 模型（约 90MB）的下载地址，按顺序尝试，逗号或换行分隔。留空则跳过向量检索层，仅使用时间窗检索。"
   },
   "vec_model_sha256": {
-    "description": "向量模型 · 校验值",
+    "description": "向量模型校验值",
     "type": "string",
     "default": "69a0b846f4f116b5e6aabf9546ea6754d02264f3211a13a1bd69b31b8040749a",
-    "hint": "填了就会比对 sha256，对不上丢掉重下。留空只核长度。"
+    "hint": "填写后对下载文件做 sha256 校验，不匹配则丢弃重下；留空仅校验文件长度。"
   },
   "affect_tone": {
-    "description": "让心情影响说话",
+    "description": "情绪影响输出语气",
     "type": "bool",
     "default": true,
-    "hint": "亲密高一点会黏，压力高一点会短。"
+    "hint": "开启后，催产素偏高时措辞更贴近，乙酰胆碱偏高时回复更简短。"
   },
   "affect_recall": {
-    "description": "让心情影响想起来的记忆",
+    "description": "情绪影响记忆召回",
     "type": "bool",
     "default": false,
-    "hint": "心情沉的时候偏向想起沉的旧事。默认关着，觉得合适再开。"
+    "hint": "开启后，血清素偏低时召回倾向负面历史内容。默认关闭。"
   },
   "decay_enable": {
-    "description": "记忆边 · 按时间压一压",
+    "description": "记忆边衰减",
     "type": "bool",
     "default": true,
-    "hint": "老得没人再碰的边慢慢变细，常走的边不动。只降不删，压到底线就停。"
+    "hint": "按时间对长期未被访问的记忆边降低权重。仅衰减不删除，到达下限后停止。接入节点数 ≥32 的枢纽边不参与衰减。"
   },
   "decay_every_hours": {
-    "description": "记忆边 · 几个钟头压一次",
+    "description": "衰减周期（小时）",
     "type": "int",
     "default": 4,
-    "hint": "默认四小时。"
+    "hint": "默认 4。"
   },
   "decay_tau_days": {
-    "description": "记忆边 · 多少天细一半",
+    "description": "衰减半衰期（天）",
     "type": "float",
     "default": 30.0,
-    "hint": "接到 32 条以上的枢纽边不动。觉得忘得太快就往上调。"
+    "hint": "默认 30，即 30 天未访问的记忆边权重降为初值一半。遗忘过快可调高。"
   },
   "reflect_enable": {
-    "description": "反思 · 事后回看那几句",
+    "description": "反思节点生成",
     "type": "bool",
     "default": false,
-    "hint": "隔几个钟头把新落的几句话重看一遍，能并成一句的才落成一颗「反思」节点。借用上面那个模型的配置。"
+    "hint": "按周期扫描近期新增的对话节点，将可归并的内容合并为一条 reflect 类型节点。使用上方模型配置。"
   },
   "reflect_every_hours": {
-    "description": "反思 · 几个钟头看一回",
+    "description": "反思周期（小时）",
     "type": "int",
     "default": 6,
-    "hint": "默认六小时。头一轮也等满这个间隔。"
+    "hint": "默认 6。首轮同样等待该间隔。"
   },
   "adv_base_drive": {
-    "description": "进阶 · 干劲的基线",
+    "description": "多巴胺 D（奖赏动机）· 基线",
     "type": "float",
     "default": 40.0,
-    "hint": "0 到 100。什么都不发生的时候会慢慢回到这个数。"
+    "hint": "取值范围 0–100，默认 40。无外部刺激时数值向该基线缓慢回落。"
   },
   "adv_base_stable": {
-    "description": "进阶 · 稳当的基线",
+    "description": "血清素 S（稳定）· 基线",
     "type": "float",
-    "default": 50.0
+    "default": 50.0,
+    "hint": "取值范围 0–100，默认 50。"
   },
   "adv_base_focus": {
-    "description": "进阶 · 专注的基线",
+    "description": "乙酰胆碱 C（专注）· 基线",
     "type": "float",
-    "default": 50.0
+    "default": 50.0,
+    "hint": "取值范围 0–100，默认 50。"
   },
   "adv_base_close": {
-    "description": "进阶 · 亲密的基线",
+    "description": "催产素 O（亲密）· 基线",
     "type": "float",
     "default": 20.0,
-    "hint": "刚装上是 20，贴着一天天往上长。"
+    "hint": "取值范围 0–100，默认 20。随长期互动累积上升，不会一夜涨满。"
   },
   "adv_base_relax": {
-    "description": "进阶 · 松弛的基线",
+    "description": "GABA G（放松抑制）· 基线",
     "type": "float",
-    "default": 50.0
+    "default": 50.0,
+    "hint": "取值范围 0–100，默认 50。"
   },
   "adv_base_comfort": {
-    "description": "进阶 · 舒服的基线",
+    "description": "内啡肽 E（快感）· 基线",
     "type": "float",
-    "default": 40.0
+    "default": 40.0,
+    "hint": "取值范围 0–100，默认 40。"
   },
   "adv_decay_speed": {
-    "description": "进阶 · 回落快慢",
+    "description": "代谢速度倍率",
     "type": "float",
     "default": 1.0,
-    "hint": "1 是默认。改 2 回得快一倍，改 0.5 拖得久一倍。"
+    "hint": "六维回落至基线的速度系数，默认 1。设为 2 时回落速度加倍，设为 0.5 时减半。可填 0.1–10。"
   },
   "adv_push_scale": {
-    "description": "进阶 · 一句话的推力",
+    "description": "刺激响应倍率",
     "type": "float",
     "default": 1.0,
-    "hint": "觉得它一天到晚太激动就往下调，太麻木就往上调。"
+    "hint": "单条消息对六维的推力系数，默认 1。数值越大，单次交互引起的激素波动越明显。可填 0.1–5。"
   },
   "adv_corrupt_speed": {
-    "description": "进阶 · 脏污涨速",
+    "description": "干扰累积速度",
     "type": "float",
     "default": 1.0,
-    "hint": "被批、被压会脏，安静待着会洗干净。数值越大越容易积。"
+    "hint": "负面反馈累积的干扰量增长率，静置时自动消退。默认 1，可填 0–5。"
   },
   "adv_state_file": {
-    "description": "进阶 · 状态存哪儿",
+    "description": "状态文件路径",
     "type": "string",
     "default": "",
-    "hint": "留空就用插件自己的 data 目录。换了路径等于重新养一个。"
+    "hint": "激素状态的落盘位置。留空使用插件数据目录下的 neurostate.json。更改路径将新建独立状态，不继承原有数值。"
   },
   "drift_enable": {
-    "description": "神游",
+    "description": "神游（离线联想）",
     "type": "bool",
     "default": false,
-    "hint": "没事的时候自己顺着旧事走几步，把路上那几句记下来。只落盘，不当场说话。"
+    "hint": "空闲时沿记忆边随机游走，记录途经内容。仅写入数据，不主动发言。"
   },
   "wake_enable": {
-    "description": "自唤醒",
+    "description": "自唤醒（主动发言）",
     "type": "bool",
     "default": false,
-    "hint": "从神游记下的那几句里挑一句，自己开口。默认关着，觉得话太少再开。"
+    "hint": "神游触及的节点符合设定标准时触发。消息会发送到最近会话，默认关闭。"
   },
   "wake_quiet_start": {
-    "description": "静默 · 从几点开始",
+    "description": "静默起始小时",
     "type": "int",
     "default": 1,
-    "hint": "0 到 23。这段时间一句话都不主动说，神游照走。"
+    "hint": "取值 0–23。静默期内不主动发言，神游照常运行。"
   },
   "wake_quiet_end": {
-    "description": "静默 · 到几点结束",
+    "description": "静默结束小时",
     "type": "int",
     "default": 7,
-    "hint": "可以比起始小，表示跨零点。"
+    "hint": "允许小于起始值，表示跨零点区间。"
   },
   "wake_per_hour": {
-    "description": "一小时最多几句",
+    "description": "每小时发言上限",
     "type": "int",
-    "default": 2
+    "default": 2,
+    "hint": "默认 2。"
   },
   "wake_per_day": {
-    "description": "一天最多几句",
+    "description": "每 24 小时发言上限",
     "type": "int",
     "default": 6,
-    "hint": "按滚动的二十四小时算，不看日历。"
+    "hint": "按滚动 24 小时计算，不按自然日重置。"
   },
   "wake_min_gap": {
-    "description": "两句之间至少隔多久（秒）",
+    "description": "最小发言间隔（秒）",
     "type": "int",
-    "default": 1800
+    "default": 1800,
+    "hint": "默认 1800，即两次主动发言至少间隔 30 分钟。"
   },
   "wake_fresh_minutes": {
-    "description": "多新的碎片才拿来开口（分钟）",
+    "description": "可引用内容时效（分钟）",
     "type": "int",
-    "default": 240
+    "default": 240,
+    "hint": "仅使用该时间窗口内的神游记录，默认 240。"
   },
   "auto_persona": {
-    "description": "人格 · 每天自己长一版",
+    "description": "人格页自动更新",
     "type": "bool",
     "default": false,
-    "hint": "到点自己写一版人格页，在上一版上改，不推倒重写。"
+    "hint": "按周期在上一版基础上增量修改，不整体重写。"
   },
   "persona_at": {
-    "description": "人格 · 几点写",
+    "description": "更新时间（HH:MM）",
     "type": "string",
     "default": "04:10",
-    "hint": "24 小时制，比如 04:10。写空就是随时可写。"
+    "hint": "24 小时制。留空表示任意时间可写入。"
   },
   "persona_chars": {
-    "description": "人格 · 写到多少字",
+    "description": "目标字数",
     "type": "int",
     "default": 900,
-    "hint": "按正文字数算，超了按句子边界截。别压着上限写。"
+    "hint": "按正文字符数计，超出时在句子边界截断。"
   },
   "auto_diary": {
-    "description": "日记 · 每天自己写一篇",
+    "description": "日记自动生成",
     "type": "bool",
     "default": false,
-    "hint": "到点自己写当天那篇。一天一篇，重写会先把旧的存进存档。"
+    "hint": "每日生成一篇当天日记。重写时旧版转存归档。"
   },
   "diary_at": {
-    "description": "日记 · 几点写",
+    "description": "生成时间（HH:MM）",
     "type": "string",
     "default": "22:30",
-    "hint": "24 小时制。写空就是随时可写。"
+    "hint": "24 小时制。留空表示任意时间可写入。"
   },
   "diary_chars": {
-    "description": "日记 · 写到多少字",
+    "description": "目标字数",
     "type": "int",
     "default": 500,
-    "hint": "按篇算，不是每天累加。短着写比写满好看。"
+    "hint": "每篇独立计，不累加。"
   },
   "auto_profile": {
-    "description": "画像 · 每天重蒸一遍他那一页",
+    "description": "用户画像自动生成",
     "type": "bool",
     "default": false,
-    "hint": "从当天原话和日记里重写，不滚上一版，免得写成一堆猜测。"
+    "hint": "每日基于当天原始对话与日记重新生成，不继承上一版，避免推测逐日累积。"
   },
   "profile_at": {
-    "description": "画像 · 几点写",
+    "description": "更新时间（HH:MM）",
     "type": "string",
     "default": "04:20",
-    "hint": "24 小时制。写空就是随时可写。"
+    "hint": "24 小时制。留空表示任意时间可写入。"
   },
   "profile_chars": {
-    "description": "画像 · 写到多少字",
+    "description": "目标字数",
     "type": "int",
     "default": 600,
-    "hint": "一条一行，超了按句子边界截。"
+    "hint": "条目不设上限，超出时在句子边界截断。"
   },
   "data_dir": {
     "type": "string",
-    "description": "数据目录（插件目录之外）",
+    "description": "数据目录",
     "default": "",
-    "hint": "节点库、图、状态、心情都落这儿。留空就用框架给的 data/plugin_data/astrbot_plugin_llmemory，升级插件不覆盖。要挪到别处就填绝对路径。"
+    "hint": "存放节点库、记忆图、状态与情绪数据。留空使用 data/plugin_data/astrbot_plugin_llmemory，升级插件时不受覆盖。支持绝对路径。"
   },
   "writer_dir": {
-    "description": "人格和日记 · 存在哪",
+    "description": "人格与日记目录",
     "type": "string",
     "default": "",
-    "hint": "留空就用数据目录下的 memory。里面有 live/、diary/、hot.md、persona.md。"
+    "hint": "留空使用数据目录下的 memory 子目录，内含 live/、diary/、hot.md、persona.md。"
   },
   "writer_provider": {
-    "description": "人格和日记 · 用哪个模型",
+    "description": "文本生成服务商 ID",
     "type": "string",
     "default": "",
-    "hint": "填模型服务商的 ID。留空就用最近说话的会话正在用的那个。"
+    "hint": "留空则使用最近活跃会话所配置的模型服务商。"
   }
 }

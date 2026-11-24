@@ -118,13 +118,6 @@ def write_mood(state, judgement=None, out_path: str | None = None) -> str:
     return line
 
 
-@register(
-    PLUGIN_NAME,
-    "",
-    "情绪与内分泌层：把一句话判成五个事件之一，落到六维状态上，跨轮存盘。不接模型也能跑。",
-    "0.1.0",
-    "",
-)
 def _speaker(event) -> str:
     """谁说的。取不到就空，别为一个名字崩。"""
     fn = getattr(event, "get_sender_name", None)
@@ -143,6 +136,13 @@ def _speaker(event) -> str:
     return ""
 
 
+@register(
+    PLUGIN_NAME,
+    "",
+    "情绪与内分泌层：把一句话判成五个事件之一，落到六维状态上，跨轮存盘。不接模型也能跑。",
+    "0.1.3",
+    "",
+)
 class LlmemoryPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig | dict | None = None):
         super().__init__(context)
