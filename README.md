@@ -27,7 +27,7 @@ numpy / onnxruntime / tokenizers。面板装插件时一般会自动装依赖；
 - `enable` 情绪模块，默认开
 - `judge_mode` 默认 `rule`，纯规则判断，不需要模型。选 `model` 才用 `model_url` / `model_key` / `model_name`；留空则退到 AstrBot 已配的 provider
 - `affect_tone` 让心情影响说话（默认开），`affect_recall` 让心情影响想起来的旧事（默认关）
-- `decay_*` 边权随时间变淡：几小时压一次、多少天细一半
+- `decay_*` 边权按时间常数 τ 指数衰减：多久压一次（默认 4 小时）、τ 多长（默认 30 天）。τ 天剩 1/e，30 天未活跃约剩 36.8%，90 天约剩 5%；连接数 ≥32 的枢纽边不参与，权重低于 1e-4 的细边清除
 - `reflect_*` 事后回看几句（默认关）
 - `drift_enable` 神游、`wake_enable` 自唤醒（默认关；开了有静默时段、每小时和每天的上限、两句之间的最小间隔）
 - `auto_persona` / `auto_diary` / `auto_profile` 每天从原始记录自己蒸一版人格、日记、画像（默认全关，要模型）
@@ -50,7 +50,7 @@ numpy / onnxruntime / tokenizers。面板装插件时一般会自动装依赖；
 ```
 main.py               插件入口、配置、指令
 _conf_schema.json     面板配置项
-llmemory/
+memorydata/
   nodes.py            节点：内容、向量、时间、来源
   graph.py            图与赫布边权、exp(-age/tau) 变淡
   vec.py              向量那层（可缺）

@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import os
 
-from ..paths import under
 from .neurostate import DIMS, EQUILIBRIUM
 
 # 面板字段 → 六维。名字是人看的，DIMS 是数学看的。
@@ -129,7 +128,7 @@ class AffectConfig:
     @staticmethod
     def _resolve_path(path: str, base_dir: str) -> str:
         if not path:
-            path = under("neurostate.json")
+            path = os.path.join("plugin_data", "neurostate.json")
         if not os.path.isabs(path) and base_dir:
             path = os.path.join(base_dir, path)
         return os.path.normpath(path)

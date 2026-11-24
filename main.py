@@ -1,4 +1,4 @@
-﻿"""llmemory 插件入口。
+"""llmemory 插件入口。
 
 T0 只做一件事的闭环：收一句话 → 判 → 落到六维 → 存盘。
 注入那层只给一句，不抄日志，也不替模型组织措辞。
@@ -9,39 +9,39 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import time
 
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
-from astrbot.core.agent.message import TextPart
 
 try:                                      # 按包加载（AstrBot 走这条）
-    from .llmemory.affect import (
+    from .memorydata.affect import (
         apply_judgement, chat, describe, judge_model, judge_tuple, load_config,
     )
-    from .llmemory import paths as P
-    from .llmemory.graph import Graph
-    from .llmemory.nodes import load_book
-    from .llmemory.recall import Recall
-    from .llmemory.reflect import Reflector
-    from .llmemory.vec import Encoder, deps_error
-    from .llmemory.model_fetch import fetch_in_background
-    from .llmemory.wake import Waker, write_target
-    from .llmemory.writer import Writer, _read
+    from .memorydata.graph import Graph
+    from .memorydata.muse import DEFAULT_PATH as MUSE_PATH
+    from .memorydata.nodes import load_book
+    from .memorydata.recall import Recall
+    from .memorydata.reflect import Reflector
+    from .memorydata.vec import Encoder, deps_error
+    from .memorydata.model_fetch import fetch_in_background
+    from .memorydata.wake import Waker, write_target
+    from .memorydata.writer import Writer, _read
 except ImportError:                       # 插件目录在 sys.path 上时
-    from llmemory.affect import (
+    from memorydata.affect import (
         apply_judgement, chat, describe, judge_model, judge_tuple, load_config,
     )
-    from llmemory import paths as P
-    from llmemory.graph import Graph
-    from llmemory.nodes import load_book
-    from llmemory.recall import Recall
-    from llmemory.reflect import Reflector
-    from llmemory.vec import Encoder, deps_error
-    from llmemory.model_fetch import fetch_in_background
-    from llmemory.wake import Waker, write_target
-    from llmemory.writer import Writer, _read
+    from memorydata.graph import Graph
+    from memorydata.muse import DEFAULT_PATH as MUSE_PATH
+    from memorydata.nodes import load_book
+    from memorydata.recall import Recall
+    from memorydata.reflect import Reflector
+    from memorydata.vec import Encoder, deps_error
+    from memorydata.model_fetch import fetch_in_background
+    from memorydata.wake import Waker, write_target
+    from memorydata.writer import Writer, _read
 
 PLUGIN_NAME = "astrbot_plugin_llmemory"
 _PLUGIN_ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -82,12 +82,30 @@ def node_mood(state) -> str:
 
 
 def _data_dir() -> str:
-    """插件的数据目录：data/plugin_data/<插件名>，由框架给。
-    面板填了 data_dir 或环境变量 LLMEMORY_DATA_DIR 就听它的。"""
-    return P.data_dir()
+    """插件自己的数据目录。默认跟着插件走；配置了 data_dir 或环境变量
+    LLMEMORY_DATA_DIR 就挪到插件目录外面，免得市场升级覆盖目录把库冲掉。"""
+    env = os.environ.get("LLMEMORY_DATA_DIR", "").strip()
+    if env:
+        return os.path.abspath(env)
+    return os.path.join(_PLUGIN_ROOT, "plugin_data")
 
 
 MOOD_OUT = os.path.join(_data_dir(), "状态", "llmemory_mood.json")
+
+# 判不出情绪的那句，也不是没发生。落一颗「日常话」节点：只进图，六维一分不动。
+TALK_EVENT = "talk"
+TALK_MIN_CHARS = 6      # 去标点后不到六个字，当语气，不当一句
+TALK_MAX = 800       # 一颗是一轮：他那句加我这句，别把回话切掉
+DEDUP_GAP = 60.0     # 同一句在这个窗口里只认一次，挡 agent 流反复请求
+PARK_TTL = 180.0     # 挂了这么久还没等到回话，就照他一个人那句落掉
+
+
+def _worth_talk(text: str) -> bool:
+    """够一句日常话才落：不是纯语气、不是光一条链接、不是一串符号。"""
+    t = (text or "").strip()
+    if not t or t.startswith(("http://", "https://")):
+        return False
+    return len(re.sub(r"[\s\W_]+", "", t, flags=re.UNICODE)) >= TALK_MIN_CHARS
 
 
 def write_mood(state, judgement=None, out_path: str | None = None) -> str:
@@ -113,11 +131,18 @@ def write_mood(state, judgement=None, out_path: str | None = None) -> str:
             json.dump(payload, f, ensure_ascii=False)
         os.replace(tmp, out)
     except Exception as e:
-        logger.warning(f"[llmemory] 心情没落上：{e}")
+        logger.warning(f"[llmemory] 情绪状态写入失败：{e}")
         return ""
     return line
 
 
+@register(
+    PLUGIN_NAME,
+    "",
+    "情绪与内分泌层：把一句话判成五个事件之一，落到六维状态上，跨轮存盘。不接模型也能跑。",
+    "0.1.0",
+    "",
+)
 def _speaker(event) -> str:
     """谁说的。取不到就空，别为一个名字崩。"""
     fn = getattr(event, "get_sender_name", None)
@@ -136,13 +161,26 @@ def _speaker(event) -> str:
     return ""
 
 
-@register(
-    PLUGIN_NAME,
-    "",
-    "情绪与内分泌层：把一句话判成五个事件之一，落到六维状态上，跨轮存盘。不接模型也能跑。",
-    "0.1.3",
-    "",
-)
+def _reply_text(resp) -> str:
+    """这条回复真正说出口的那段。工具调用、流式切片、空话都算没说。"""
+    if getattr(resp, "role", "") not in ("assistant", ""):
+        return ""
+    if getattr(resp, "is_chunk", False):
+        return ""
+    if getattr(resp, "tools_call_name", None):
+        return ""
+    text = ""
+    chain = getattr(resp, "result_chain", None)
+    if chain is not None:
+        try:
+            text = chain.get_plain_text()
+        except Exception:
+            text = ""
+    if not str(text).strip():
+        text = getattr(resp, "completion_text", "") or ""
+    return str(text).strip()
+
+
 class LlmemoryPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig | dict | None = None):
         super().__init__(context)
@@ -173,16 +211,15 @@ class LlmemoryPlugin(Star):
         self.recall = Recall(self.book, graph=self.graph, enc=self.encoder)
         self._recall_task = None
         self.last_umo = ""
-        # 人格页和日记：目录走 P.data_dir()，换了路径就换一个库。
+        # 每个人最近落的那颗日常话，一分钟内的话并进去
+        # 谁最近说了哪句：agent 流一轮请求好几回，同一句别反复记
+        self._seen = {}
+        # 一轮问答挂在这儿等回话：他这句先判，节点等我这句到了再落
+        self._pending = {}
+        # 人格页和日记：目录跟着插件自己的 plugin_data 走，换了路径就换一个库。
         wdir = str(self.raw_config.get("writer_dir") or "").strip() \
             or os.path.join(_data_dir(), "memory")
         self.writer = Writer(wdir, config=self.raw_config)
-        try:                              # 还没人格页就先铺一版白板，别让注入那块永远空着
-            seeded = self.writer.seed()
-            if seeded:
-                logger.info(f"[llmemory] 白板人格铺好了：{seeded}")
-        except Exception as e:
-            logger.warning(f"[llmemory] 白板人格没铺成：{e}")
         self._writer_task = None
         self._decay_task = None
         self.decay_file = os.path.join(_data_dir(), "状态", "decay.json")
@@ -191,16 +228,16 @@ class LlmemoryPlugin(Star):
         self._reflect_task = None
         self.waker = Waker(
             self, nodes_path=self.nodes_path,
-            muse_path=P.under("暗处", "muse.jsonl"))
-        logger.info(f"[llmemory] 起来了，judge_mode={self.cfg.judge_mode}，"
-                    f"state={self.cfg.state_file}，节点 {len(self.book)} 颗")
+            muse_path=os.path.join(_data_dir(), MUSE_PATH.replace("plugin_data" + os.sep, "")))
+        logger.info(f"[llmemory] 初始化完成，judge_mode={self.cfg.judge_mode}，"
+                    f"state={self.cfg.state_file}，节点数 {len(self.book)}")
         _vec_err = deps_error()
         if _vec_err:
-            logger.warning(f"[llmemory] 向量依赖缺着，检索走时间窗：{_vec_err}")
+            logger.warning(f"[llmemory] 向量依赖缺失，检索降级为时间窗：{_vec_err}")
 
     def _on_vec_ready(self):
         """模型下齐了。编码器是懒加载的，下次要向量时自己会读到。"""
-        logger.info("[llmemory] 向量模型到齐，检索那层能用了。")
+        logger.info("[llmemory] 向量模型已就绪，向量检索可用。")
 
     # ---- 判 ------------------------------------------------------------
 
@@ -215,43 +252,86 @@ class LlmemoryPlugin(Star):
             try:
                 got = judge_model(text, self.cfg)
             except Exception as e:
-                logger.warning(f"[llmemory] 模型短判失败：{e}")
+                logger.warning(f"[llmemory] 模型判官调用失败：{e}")
                 got = None
             if got:
                 return got                 # 模型判出来了就用它
         try:
             return judge_tuple(text)
         except Exception as e:            # 词表炸了也不该拦住对话
-            logger.warning(f"[llmemory] 规则判失败：{e}")
+            logger.warning(f"[llmemory] 规则判官调用失败：{e}")
             return None
 
     def _step(self, payload):
-        """判 + 落状态 + 存盘。同步，调用方丢线程里跑。判出来的那一下要带回给提示用。"""
-        raw, who = payload if isinstance(payload, tuple) else (payload, "")
-        text = str(raw or "")
-        who = str(who or "")
+        """判 + 落状态 + 存盘，把这一轮挂起来等回话。同步，调用方丢线程里跑。
+
+        一颗节点是一轮问答：他这句先判，六维当场动（这一轮拼提示要用），
+        节点不在这儿落，等我这句回来，两半并一颗。
+        """
+        text, who, umo = payload if isinstance(payload, tuple) else (payload, "", "")
+        text, who, umo = str(text or ""), str(who or ""), str(umo or "")
         self._note_live(who, text)
-        judgement = self._judge(text)
-        self.state = apply_judgement(self.state, judgement, **self.cfg.judge_kwargs())
-        self.cfg.save_state(self.state)
-        line = write_mood(self.state, judgement, self.mood_path)
-        self._add_node(judgement, line, raw=text[:200], who=who)
+        # 一句话只认一次。agent 流一轮里模型会请求好几回，
+        # message_str 反复是同一句，不去重就一层层往库里叠。
+        hit = self._seen.get(who)
+        fresh = not (hit and hit[0] == text and 0.0 <= time.time() - hit[1] <= DEDUP_GAP)
+        if fresh:
+            judgement = self._judge(text)
+            self.state = apply_judgement(self.state, judgement, **self.cfg.judge_kwargs())
+            self.cfg.save_state(self.state)
+            line = write_mood(self.state, judgement, self.mood_path)
+        else:
+            judgement, line = hit[2], hit[3]
+        self._park(umo, text, who, judgement, line)
+        if fresh and text:
+            self._seen[who] = (text, time.time(), judgement, line)
+            if len(self._seen) > 256:
+                now = time.time()
+                self._seen = {k: v for k, v in self._seen.items() if now - v[1] <= DEDUP_GAP}
         return judgement
 
-    def _add_node(self, judgement, line: str, raw: str = "", who: str = "") -> None:
-        """这一下也落一颗，神游才有地方走。落不上不算事。"""
-        if not judgement or not line:
+    def _park(self, umo: str, text: str, who: str, judgement, line: str) -> None:
+        """这一轮先挂在这儿等回话。上一轮要是没等到回话，先照他那句落掉，别一直压着。"""
+        if not line:
             return
+        old = self._pending.get(umo)
+        if old is not None and time.time() - old[4] > PARK_TTL:
+            self._pending.pop(umo, None)
+            self._land(old, "")
+        self._pending[umo] = (text, who, judgement, line, time.time())
+
+    def _land(self, pend, say: str) -> None:
+        """一轮收口：他那句在前，我这句在后，一颗落下去。"""
+        text, who, judgement, line = pend[0], pend[1], pend[2], pend[3]
+        his, mine = (text or "").strip(), (say or "").strip()
+        raw = f"他：{his}\n我：{mine}" if mine else f"他：{his}"
+        self._add_node(judgement, line, raw=raw[-TALK_MAX:], who=who, his=his)
+
+    def _add_node(self, judgement, line: str, raw: str = "", who: str = "",
+                  his: str = "") -> None:
+        """一轮落一颗，神游才有地方走。落不上不算事。
+
+        判出情绪就落情绪那颗；判不出也落，记成日常话。
+        只留下被戳的那几下，热闹的话全漏掉，库就不像日子了。
+        算不算数看他那句，别拿我这句的篇幅替他凑。
+        """
+        if not line:
+            return
+        if judgement:
+            event, scale = str(judgement[0]), float(judgement[1])
+        else:
+            if not _worth_talk(his or raw):
+                return
+            event, scale = TALK_EVENT, 0.0
         try:
-            node = self.book.add(str(judgement[0]), float(judgement[1]),
-                                 line, raw=raw, who=who)
+            node = self.book.add(event, scale, line, raw=raw, who=who)
         except Exception as e:
-            logger.warning(f"[llmemory] 节点没落上：{e}")
+            logger.warning(f"[llmemory] 节点写入失败：{e}")
             return
         try:
             self.recall.add(node)
         except Exception as e:                 # 连不上边不影响节点已经落了
-            logger.warning(f"[llmemory] 向量没连上：{e}")
+            logger.warning(f"[llmemory] 向量生成失败：{e}")
 
     def _note_session(self, event) -> None:
         """记下最近说话的地方，自唤醒醒了才知道往哪发。"""
@@ -289,7 +369,7 @@ class LlmemoryPlugin(Star):
             with open(p, "a", encoding="utf-8") as f:
                 f.write("%s：%s\n" % (who or "对方", text[:300].replace("\n", " ")))
         except Exception as e:
-            logger.warning(f"[llmemory] 实况没落上：{e}")
+            logger.warning(f"[llmemory] 实况写入失败：{e}")
 
     async def _gen_text(self, system: str, prompt: str) -> str:
         """调模型。配了 model_url + model_name 就直连那家；其次 writer_provider；
@@ -305,11 +385,11 @@ class LlmemoryPlugin(Star):
                      {"role": "user", "content": prompt}],
                     2000, 180.0, 0.8)
             except Exception as e:
-                logger.warning(f"[llmemory] 直连模型失败：{e}")
+                logger.warning(f"[llmemory] 直连模型调用失败：{e}")
                 text = ""
             if text:
                 return text
-            logger.warning("[llmemory] 直连模型没回，退回 AstrBot 的 provider")
+            logger.warning("[llmemory] 直连模型未返回，回退至 AstrBot provider")
         pid = str(self.raw_config.get("writer_provider") or "").strip()
         try:
             if pid:
@@ -321,7 +401,7 @@ class LlmemoryPlugin(Star):
             resp = await prov.text_chat(prompt=prompt, system_prompt=system)
             return getattr(resp, "completion_text", "") or ""
         except Exception as e:
-            logger.warning(f"[llmemory] 调模型写东西失败：{e}")
+            logger.warning(f"[llmemory] 调用模型生成内容失败：{e}")
             return ""
 
     async def _write_kind(self, kind: str) -> str:
@@ -334,30 +414,29 @@ class LlmemoryPlugin(Star):
             return ""
         p = await asyncio.to_thread(self.writer.save, kind, text)
         if p:
-            logger.info(f"[llmemory] 写下{label}：{p}")
+            logger.info(f"[llmemory] 已生成{label}：{p}")
         return p
 
     async def _writer_loop(self) -> None:
         """一分钟看一次，到点就写。写不写得成都不吵。"""
         while True:
             try:
-                for kind in ("persona", "profile", "diary"):
+                for kind in ("persona", "diary"):
                     if self.writer.due(kind):
                         await self._write_kind(kind)
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                logger.warning(f"[llmemory] 写人格/日记这一轮出错：{e}")
+                logger.warning(f"[llmemory] 人格/日记生成本轮出错：{e}")
             await asyncio.sleep(60)
 
     def _writer_start(self) -> None:
         if self._writer_task is not None and not self._writer_task.done():
             return
-        if not (self.writer.enabled("persona") or self.writer.enabled("profile")
-                or self.writer.enabled("diary")):
+        if not (self.writer.enabled("persona") or self.writer.enabled("diary")):
             return
         self._writer_task = asyncio.create_task(self._writer_loop())
-        logger.info(f"[llmemory] 写人格与日记的循环起了，库在 {self.writer.mem}")
+        logger.info(f"[llmemory] 人格与日记定时任务已启动，数据目录：{self.writer.mem}")
 
     async def _writer_stop(self) -> None:
         task, self._writer_task = self._writer_task, None
@@ -371,10 +450,9 @@ class LlmemoryPlugin(Star):
     # ---- 衰减 ----------------------------------------------------------
 
     def _decay_once(self) -> int:
-        """把边按时间压一遍，压完存盘。同步，调用方丢线程里跑。"""
-        if not len(self.graph.ids):
-            return 0                       # 图还没读进来，不拿空的去盖盘
+        """把两套边按时间压一遍，压完存盘。同步，调用方丢线程里跑。"""
         days = float(self.raw_config.get("decay_tau_days") or 30.0)
+        tau = max(days, 0.1) * 86400.0
         now = time.time()
         since = None
         try:
@@ -384,20 +462,28 @@ class LlmemoryPlugin(Star):
             since = None                   # 头一回，按节点自己的岁数算
         if since and since >= now:
             since = None                   # 钟回拨过，别压成负数
-        changed = self.graph.decay(tau=max(days, 0.1) * 86400.0,
-                                   now=now, since=since)
+        changed = 0
+        if len(self.graph.ids):
+            changed = self.graph.decay(tau=tau, now=now, since=since)
+        else:
+            logger.warning("[llmemory] 图未加载，本轮仅衰减节点库边权。")
+        # 节点库那套边也压：神游走的就是这张图，不压会越抽越粗
+        try:
+            changed += self.book.decay(tau=tau, now=now, since=since)
+        except Exception as e:
+            logger.warning(f"[llmemory] 节点边衰减失败：{e}")
         # 先记下这一趟，再存图：存图失败也不至于下一趟把两回的量一起压
         try:
             os.makedirs(os.path.dirname(self.decay_file), exist_ok=True)
             with open(self.decay_file, "w", encoding="utf-8") as f:
                 json.dump({"ts": now}, f)
         except Exception as e:
-            logger.warning(f"[llmemory] 压边的时间戳没记上：{e}")
-        if changed:
+            logger.warning(f"[llmemory] 衰减时间戳写入失败：{e}")
+        if changed and len(self.graph.ids):
             try:
                 self.graph.save()
             except Exception as e:
-                logger.warning(f"[llmemory] 压完的图没存上：{e}")
+                logger.warning(f"[llmemory] 衰减后的图保存失败：{e}")
         return changed
 
     async def _decay_loop(self) -> None:
@@ -409,11 +495,11 @@ class LlmemoryPlugin(Star):
             try:
                 n = await eventloop_run(self._decay_once)
                 if n:
-                    logger.info(f"[llmemory] 边压了一轮，动了 {n} 条。")
+                    logger.info(f"[llmemory] 边权衰减完成，变更 {n} 条。")
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                logger.warning(f"[llmemory] 压边这一轮出错：{e}")
+                logger.warning(f"[llmemory] 边权衰减本轮出错：{e}")
 
     def _decay_start(self) -> None:
         if self._decay_task is not None and not self._decay_task.done():
@@ -421,7 +507,7 @@ class LlmemoryPlugin(Star):
         if not self.raw_config.get("decay_enable", True):
             return
         self._decay_task = asyncio.create_task(self._decay_loop())
-        logger.info("[llmemory] 边的衰减循环起了。")
+        logger.info("[llmemory] 边权衰减定时任务已启动。")
 
     async def _decay_stop(self) -> None:
         task, self._decay_task = self._decay_task, None
@@ -457,11 +543,11 @@ class LlmemoryPlugin(Star):
             try:
                 n = await self._reflect_once()
                 if n:
-                    logger.info("[llmemory] 反思落了一句。")
+                    logger.info("[llmemory] 反思生成完成。")
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                logger.warning(f"[llmemory] 反思这一轮出错：{e}")
+                logger.warning(f"[llmemory] 反思本轮出错：{e}")
 
     def _reflect_start(self) -> None:
         if self._reflect_task is not None and not self._reflect_task.done():
@@ -469,10 +555,10 @@ class LlmemoryPlugin(Star):
         if not self.raw_config.get("reflect_enable", False):
             return
         if self._reflect_call() is None:
-            logger.info("[llmemory] 反思没起：模型三样没配齐。")
+            logger.info("[llmemory] 反思未启动：模型配置不完整。")
             return
         self._reflect_task = asyncio.create_task(self._reflect_loop())
-        logger.info("[llmemory] 反思的循环起了。")
+        logger.info("[llmemory] 反思定时任务已启动。")
 
     async def _reflect_stop(self) -> None:
         task, self._reflect_task = self._reflect_task, None
@@ -490,7 +576,7 @@ class LlmemoryPlugin(Star):
         self._recall_start()
         if getattr(self.waker, "drift_enable", False) or getattr(self.waker, "wake_enable", False):
             self.waker.start()
-            logger.info("[llmemory] 神游与自唤醒的循环起了。")
+            logger.info("[llmemory] 神游与自唤醒定时任务已启动。")
         self._writer_start()
         self._decay_start()
         self._reflect_start()
@@ -501,16 +587,16 @@ class LlmemoryPlugin(Star):
             try:
                 await eventloop_run(self._recall_warm)
             except Exception as e:
-                logger.warning(f"[llmemory] 取回没热起来：{e}")
+                logger.warning(f"[llmemory] 检索预热失败：{e}")
         try:
             self._recall_task = asyncio.get_event_loop().create_task(run())
         except Exception as e:
-            logger.warning(f"[llmemory] 预热任务没起：{e}")
+            logger.warning(f"[llmemory] 预热任务创建失败：{e}")
 
     def _recall_warm(self) -> None:
         """线程里干：载模型 -> 读图 -> 补缺的向量 -> 边不对就重算一次。"""
         if not self.encoder.ready:
-            logger.warning("[llmemory] 没找着向量模型，取回先退成时间窗。")
+            logger.warning("[llmemory] 未找到向量模型，检索降级为时间窗。")
             return
         self.encoder.load()
         self.graph.load()
@@ -518,8 +604,8 @@ class LlmemoryPlugin(Star):
         edges = len(self.graph.edges)
         if added or edges == 0:
             edges = self.recall.rebuild()
-        logger.info(f"[llmemory] 取回醒了：图 {len(self.graph.ids)} 行，"
-                    f"补 {added} 条向量，{edges} 条边。")
+        logger.info(f"[llmemory] 检索预热完成：图 {len(self.graph.ids)} 行，"
+                    f"新增向量 {added} 条，边 {edges} 条。")
 
     @filter.on_llm_request()
     async def _on_request(self, event: AstrMessageEvent, req):
@@ -528,38 +614,37 @@ class LlmemoryPlugin(Star):
             return
         say = event.message_str or ""
         try:
-            judgement = await eventloop_run(self._step, (say, _speaker(event)))
+            judgement = await eventloop_run(
+                self._step, (say, _speaker(event), event.unified_msg_origin or ""))
         except Exception as e:
             logger.warning(f"[llmemory] 状态更新失败：{e}")
             judgement = None
         blocks = []
-        # 人格页：整页带上，卡 writer 的字数上限（默认 900），放最前
+        # 人格页：整页带上，卡 writer 的字数上限（默认 900），接在平台人设后面当补充
         try:
             page = _read(self.writer.persona, self.writer.chars("persona"))
         except Exception as e:
-            logger.warning(f"[llmemory] 人格页读不出来：{e}")
+            logger.warning(f"[llmemory] 人格页读取失败：{e}")
+            page = ""
+        # 白板稿不注入：名字还没定、话还没长开的那种，别去压平台自己写的人设
+        if page and any(w in page for w in ("还没定", "名字还没定", "名字等有人给我起")):
+            logger.info("[llmemory] 人格页为空，本轮跳过注入。")
             page = ""
         if page:
-            blocks.append("【我是谁】\n" + page)
-        # 他那一页：结构是我定的那几节，模型写得出就写，写不出就空着
-        try:
-            prof = _read(self.writer.target("profile"), self.writer.chars("profile"))
-        except Exception as e:
-            logger.warning(f"[llmemory] 画像读不出来：{e}")
-            prof = ""
-        if prof:
-            blocks.append("【关于他】\n" + prof)
+            blocks.append("【我是谁·相处里攒出来的一页】\n"
+                          "这一页只当补充。平台/system 里已经定好的人设优先，"
+                          "口气、称呼、来路都照那份来；两处不一致，以平台那份为准。\n" + page)
         # 取回独立成段，不受心情开关牵连
         try:
             items = await eventloop_run(self.recall.query, say)
         except Exception as e:
-            logger.warning(f"[llmemory] 想不起来：{e}")
+            logger.warning(f"[llmemory] 记忆检索失败：{e}")
             items = []
         if items:
             try:
                 block = self.recall.render(items)
             except Exception as e:
-                logger.warning(f"[llmemory] 想起的拼不出来：{e}")
+                logger.warning(f"[llmemory] 检索结果组装失败：{e}")
                 block = ""
             if block:
                 blocks.append(block)
@@ -567,19 +652,31 @@ class LlmemoryPlugin(Star):
             try:
                 line = self._mood_line(judgement)
             except Exception as e:
-                logger.warning(f"[llmemory] 心情拼不出来：{e}")
+                logger.warning(f"[llmemory] 情绪注入文本生成失败：{e}")
                 line = ""
             if line:
                 blocks.append(line)
         if blocks:
-            # 人格页、画像、想起的、心情句都是这一轮临时给的：走 extra_user_content_parts
-            # 并标 temp，只喂给模型，不进会话历史，也不动 system_prompt（缓存命中靠它）。
-            try:
-                for block in blocks:
-                    req.extra_user_content_parts.append(
-                        TextPart(text=block).mark_as_temp())
-            except Exception as e:
-                logger.warning(f"[llmemory] 注入没挂上：{e}")
+            req.system_prompt = (req.system_prompt or "") + "\n" + "\n".join(blocks)
+
+    @filter.on_llm_response()
+    async def _on_response(self, event: AstrMessageEvent, resp):
+        """一轮问答收口：我这句出口了，和他那句并成一颗落。
+
+        生成失败、被工具调用截断、只有流式切片，都当没说话，这一轮继续挂着。
+        """
+        try:
+            umo = getattr(event, "unified_msg_origin", "") or ""
+            say = _reply_text(resp)
+            if not say or not umo:
+                return
+            pend = self._pending.get(umo)
+            if pend is None:
+                return
+            self._pending.pop(umo, None)
+            await eventloop_run(self._land, (pend, say))
+        except Exception as e:
+            logger.warning(f"[llmemory] 本轮状态写入失败：{e}")
 
     @filter.command("情绪")
     async def show_state(self, event: AstrMessageEvent):
@@ -600,23 +697,16 @@ class LlmemoryPlugin(Star):
         yield event.plain_result(("写好了：" + os.path.basename(str(p))) if p else "没写成，模型没回或写不进。")
         yield event.plain_result(self.writer.status())
 
-    @filter.command("写画像")
-    async def write_profile_now(self, event: AstrMessageEvent):
-        """现在就从原话重蒸一遍他那一页。"""
-        p = await self._write_kind("profile")
-        yield event.plain_result(("写好了：" + os.path.basename(str(p))) if p else "没写成，模型没回或写不进。")
-        yield event.plain_result(self.writer.status())
-
     async def terminate(self) -> None:
         try:
             await self.waker.stop()
         except Exception as e:
-            logger.warning(f"[llmemory] 自唤醒没停干净：{e}")
+            logger.warning(f"[llmemory] 自唤醒停止异常：{e}")
         await self._writer_stop()
         await self._decay_stop()
         await self._reflect_stop()
         self.cfg.save_state(self.state)
-        logger.info("[llmemory] 关了，状态已落盘。")
+        logger.info("[llmemory] 插件已卸载，状态已保存。")
 
 
 async def eventloop_run(fn, *args):
