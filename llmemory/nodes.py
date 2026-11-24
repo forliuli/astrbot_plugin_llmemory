@@ -21,7 +21,13 @@ import random
 import time
 import uuid
 
-DEFAULT_PATH = os.path.join("plugin_data", "nodes.json")   # 名字照旧，里面一行一颗
+from . import paths as P
+
+
+def default_path() -> str:
+    """数据目录里的节点册。一行一颗，名字照旧。"""
+    return P.under("nodes.json")
+
 EDGE_WINDOW = 1800.0     # 半小时内落的节点算挨着
 MAX_EDGE = 8.0           # 一条边最多这么粗，再走也不更近
 HALF_LIFE = 3 * 86400.0  # 热点按三天半衰算，一周前的还留一点余地
@@ -167,7 +173,7 @@ class NodeBook:
     __slots__ = ("path", "nodes", "_lines")
 
     def __init__(self, path: str = ""):
-        self.path = path or DEFAULT_PATH
+        self.path = path or default_path()
         self.nodes = {}
         self._lines = 0
 

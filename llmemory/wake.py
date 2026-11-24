@@ -19,14 +19,11 @@ import os
 import random
 import time
 
-from . import muse as M
-from .nodes import load_book
+from astrbot.api import logger
 
-try:
-    from astrbot.api import logger
-except Exception:                                   # 单独跑脚本时
-    import logging
-    logger = logging.getLogger("llmemory.wake")
+from . import muse as M
+from . import paths as P
+from .nodes import load_book
 
 TICK = 1800.0          # 多久醒一次
 QUIET = (1, 7)         # 静默时段：凌晨一点到七点
@@ -36,8 +33,12 @@ MIN_GAP = 1800.0       # 两次开口至少隔半小时
 FRESH_MINUTES = 240.0  # 四小时内落的碎片才算新
 KEEP_SENT = 24
 
-STATE_NAME = os.path.join("plugin_data", "状态", "wake.json")
-TARGET_NAME = os.path.join("plugin_data", "状态", "wake_target.txt")
+def _state_path() -> str:
+    return P.under("状态", "wake.json")
+
+
+def _target_path() -> str:
+    return P.under("状态", "wake_target.txt")
 
 
 def _num(raw: dict, key: str, default: float, lo: float, hi: float) -> float:
@@ -68,9 +69,9 @@ class Waker:
     def __init__(self, plugin, nodes_path: str = "", muse_path: str = "",
                  state_path: str = ""):
         self.plugin = plugin
-        self.nodes_path = nodes_path or os.path.join("plugin_data", "nodes.json")
-        self.muse_path = muse_path or M.DEFAULT_PATH
-        self.state_path = state_path or STATE_NAME
+        self.nodes_path = nodes_path or P.under("nodes.json")
+        self.muse_path = muse_path or M.default_path()
+        self.state_path = state_path or _state_path()
         self.sent = []                              # 开口的时刻，跨重启留着
         self.said_starts = []
         self.last_drift = 0.0
@@ -196,7 +197,7 @@ class Waker:
         if umo:
             return umo
         try:
-            with open(TARGET_NAME, "r", encoding="utf-8") as f:
+            with open(_target_path(), "r", encoding="utf-8") as f:
                 return f.read().strip()
         except OSError:
             return ""
@@ -280,10 +281,10 @@ def write_target(umo: str) -> None:
     if not umo:
         return
     try:
-        folder = os.path.dirname(TARGET_NAME)
+        folder = os.path.dirname(_target_path())
         if folder:
             os.makedirs(folder, exist_ok=True)
-        with open(TARGET_NAME, "w", encoding="utf-8") as f:
+        with open(_target_path(), "w", encoding="utf-8") as f:
             f.write(umo)
     except OSError:
         pass

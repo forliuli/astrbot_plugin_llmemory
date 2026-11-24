@@ -41,7 +41,7 @@ numpy / onnxruntime / tokenizers。面板装插件时一般会自动装依赖；
 ## 装之前请留意
 
 - 这个记忆系统没做短期上下文库，**平台的上下文长度别设太小**。压过来的话太少，节点就稀疏，图也长不出东西来。
-- 数据落在插件目录下的 `plugin_data/`，可以用 `data_dir` 挪走。要备份就备份那里，`nodes.json`、`graph.npz`、`neurostate.json` 是主干。
+- 数据落在 `data/plugin_data/astrbot_plugin_llmemory/`，框架给的目录，可以用 `data_dir` 挪走。要备份就备份那里，`nodes.json`、`graph.npz`、`neurostate.json` 是主干。
 - 各模块都能单独关，全关时对原来的对话零影响。怕吵就把神游、自唤醒、反思都留着关。
 - 用到的是 AstrBot 通用事件和 `unified_msg_origin`，没绑特定平台。
 
@@ -66,4 +66,4 @@ models/tokenizer.json 分词表
 
 ## 反馈
 
-有问题提到 Issues。这套系统是我与 liuli 使用 ai 制作的。
+有问题提到 Issues。部分使用 ai 制作。

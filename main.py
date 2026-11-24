@@ -14,13 +14,14 @@ import time
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
+from astrbot.core.agent.message import TextPart
 
 try:                                      # 按包加载（AstrBot 走这条）
     from .llmemory.affect import (
         apply_judgement, chat, describe, judge_model, judge_tuple, load_config,
     )
+    from .llmemory import paths as P
     from .llmemory.graph import Graph
-    from .llmemory.muse import DEFAULT_PATH as MUSE_PATH
     from .llmemory.nodes import load_book
     from .llmemory.recall import Recall
     from .llmemory.reflect import Reflector
@@ -32,8 +33,8 @@ except ImportError:                       # 插件目录在 sys.path 上时
     from llmemory.affect import (
         apply_judgement, chat, describe, judge_model, judge_tuple, load_config,
     )
+    from llmemory import paths as P
     from llmemory.graph import Graph
-    from llmemory.muse import DEFAULT_PATH as MUSE_PATH
     from llmemory.nodes import load_book
     from llmemory.recall import Recall
     from llmemory.reflect import Reflector
@@ -81,12 +82,9 @@ def node_mood(state) -> str:
 
 
 def _data_dir() -> str:
-    """插件自己的数据目录。默认跟着插件走；配置了 data_dir 或环境变量
-    LLMEMORY_DATA_DIR 就挪到插件目录外面，免得市场升级覆盖目录把库冲掉。"""
-    env = os.environ.get("LLMEMORY_DATA_DIR", "").strip()
-    if env:
-        return os.path.abspath(env)
-    return os.path.join(_PLUGIN_ROOT, "plugin_data")
+    """插件的数据目录：data/plugin_data/<插件名>，由框架给。
+    面板填了 data_dir 或环境变量 LLMEMORY_DATA_DIR 就听它的。"""
+    return P.data_dir()
 
 
 MOOD_OUT = os.path.join(_data_dir(), "状态", "llmemory_mood.json")
@@ -175,7 +173,7 @@ class LlmemoryPlugin(Star):
         self.recall = Recall(self.book, graph=self.graph, enc=self.encoder)
         self._recall_task = None
         self.last_umo = ""
-        # 人格页和日记：目录跟着插件自己的 plugin_data 走，换了路径就换一个库。
+        # 人格页和日记：目录走 P.data_dir()，换了路径就换一个库。
         wdir = str(self.raw_config.get("writer_dir") or "").strip() \
             or os.path.join(_data_dir(), "memory")
         self.writer = Writer(wdir, config=self.raw_config)
@@ -193,7 +191,7 @@ class LlmemoryPlugin(Star):
         self._reflect_task = None
         self.waker = Waker(
             self, nodes_path=self.nodes_path,
-            muse_path=os.path.join(_data_dir(), MUSE_PATH.replace("plugin_data" + os.sep, "")))
+            muse_path=P.under("暗处", "muse.jsonl"))
         logger.info(f"[llmemory] 起来了，judge_mode={self.cfg.judge_mode}，"
                     f"state={self.cfg.state_file}，节点 {len(self.book)} 颗")
         _vec_err = deps_error()
@@ -574,7 +572,14 @@ class LlmemoryPlugin(Star):
             if line:
                 blocks.append(line)
         if blocks:
-            req.system_prompt = (req.system_prompt or "") + "\n" + "\n".join(blocks)
+            # 人格页、画像、想起的、心情句都是这一轮临时给的：走 extra_user_content_parts
+            # 并标 temp，只喂给模型，不进会话历史，也不动 system_prompt（缓存命中靠它）。
+            try:
+                for block in blocks:
+                    req.extra_user_content_parts.append(
+                        TextPart(text=block).mark_as_temp())
+            except Exception as e:
+                logger.warning(f"[llmemory] 注入没挂上：{e}")
 
     @filter.command("情绪")
     async def show_state(self, event: AstrMessageEvent):

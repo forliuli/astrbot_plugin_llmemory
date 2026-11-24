@@ -13,9 +13,14 @@ import os
 import random
 import time
 
+from . import paths as P
 from .nodes import NodeBook, mood_phrases
 
-DEFAULT_PATH = os.path.join("plugin_data", "暗处", "muse.jsonl")
+
+def default_path() -> str:
+    """神游落的碎片，跟节点册放一处。"""
+    return P.under("暗处", "muse.jsonl")
+
 
 DAY_HOPS = (1, 3)          # 白天：短走
 NIGHT_HOPS = (4, 6)        # 夜里：长漫步
@@ -206,7 +211,7 @@ def matches(item: dict, mood: str) -> bool:
 def run_once(book: NodeBook, path: str = "", mood: str = "",
              now_ts: float | None = None) -> dict | None:
     """一次完整的神游：走、拼、落。返回落下的那条，没走成给 None。"""
-    path = path or DEFAULT_PATH
+    path = path or default_path()
     item = wander(book, mood=mood, now_ts=now_ts, avoid=avoid_set(path))
     if item is None:
         return None
