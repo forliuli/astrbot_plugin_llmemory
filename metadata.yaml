@@ -1,13 +1,13 @@
 name: astrbot_plugin_llmemory
-display_name: LL类神经记忆情绪系统
+display_name: llmemory(赫布记忆情绪系统)
 short_desc: 节点靠赫布学习自己连边，随时间变淡、随情绪取回；不配模型也能起来。
-desc: "采用模拟神经激活的赫布学习向量库，拥有内分泌情绪系统、神游联想机制和自唤醒功能。\
-  完全本地的记忆系统，日常对话完全自洽，仅反思与情绪功能可选择性另接 llm（不接也没事，插件本身有替代的量表方案，只是理解能力略差一点）。\
+desc: "本地记忆插件。采用模拟神经激活的赫布学习向量库，拥有内分泌情绪系统、神游联想机制和自唤醒功能。\
+  日常对话完全自洽，仅反思与情绪功能可选择性另接 llm（不接也没事，插件本身有替代的量表方案，只是理解能力略差一点）。\
   此记忆系统适合日常对话，未专门设计短期上下文库所以平台上下文不要设太少。\
   各模块能单独关，全关时对原来的对话零影响。部分使用 ai 制作。\
   如有问题可与我反馈，谢谢。"
 help: 默认全自动，不需要指令。/情绪 看一眼当前六维状态。面板里 judge_mode 选 rule 就不需要任何模型配置。
-version: v0.1.1
+version: v0.1.2
 author: forliuli
 repo: https://github.com/forliuli/astrbot_plugin_llmemory
 astrbot_version: ">=4.16,<5"
@@ -16,3 +16,10 @@ support_platforms:
   - qq_official
   - telegram
   - lark
+category: 长期记忆
+tags:
+  - 长期记忆
+  - 记忆
+  - 记忆增强
+  - 人格
+  - 情绪
