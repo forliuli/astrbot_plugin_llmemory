@@ -27,6 +27,7 @@ try:                                      # 按包加载（AstrBot 走这条）
     from .memorydata.reflect import Reflector
     from .memorydata.vec import Encoder, deps_error
     from .memorydata.model_fetch import fetch_in_background
+    from .memorydata import paths as _paths
     from .memorydata.wake import Waker, write_target
     from .memorydata.writer import Writer, _read
 except ImportError:                       # 插件目录在 sys.path 上时
@@ -40,6 +41,7 @@ except ImportError:                       # 插件目录在 sys.path 上时
     from memorydata.reflect import Reflector
     from memorydata.vec import Encoder, deps_error
     from memorydata.model_fetch import fetch_in_background
+    from memorydata import paths as _paths
     from memorydata.wake import Waker, write_target
     from memorydata.writer import Writer, _read
 
@@ -82,12 +84,10 @@ def node_mood(state) -> str:
 
 
 def _data_dir() -> str:
-    """插件自己的数据目录。默认跟着插件走；配置了 data_dir 或环境变量
-    LLMEMORY_DATA_DIR 就挪到插件目录外面，免得市场升级覆盖目录把库冲掉。"""
-    env = os.environ.get("LLMEMORY_DATA_DIR", "").strip()
-    if env:
-        return os.path.abspath(env)
-    return os.path.join(_PLUGIN_ROOT, "plugin_data")
+    """插件的数据目录，绝对路径。默认走框架给的 data/plugin_data/<插件名>，
+    升级插件不碰它；配置了 data_dir 或环境变量 LLMEMORY_DATA_DIR 就挪过去，
+    那是显式挪库的口子。"""
+    return _paths.data_dir()
 
 
 MOOD_OUT = os.path.join(_data_dir(), "状态", "llmemory_mood.json")
@@ -228,7 +228,7 @@ class LlmemoryPlugin(Star):
         self._reflect_task = None
         self.waker = Waker(
             self, nodes_path=self.nodes_path,
-            muse_path=os.path.join(_data_dir(), MUSE_PATH.replace("plugin_data" + os.sep, "")))
+            muse_path=os.path.join(_data_dir(), "暗处", "muse.jsonl"))
         logger.info(f"[llmemory] 初始化完成，judge_mode={self.cfg.judge_mode}，"
                     f"state={self.cfg.state_file}，节点数 {len(self.book)}")
         _vec_err = deps_error()

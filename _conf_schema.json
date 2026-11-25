@@ -240,13 +240,13 @@
     "type": "string",
     "description": "数据目录（插件目录之外）",
     "default": "",
-    "hint": "节点库、图、状态、心情都落这儿。留空就用插件目录下的 plugin_data——市场升级插件时会被覆盖，库会丢。建议填一个插件目录外的绝对路径。"
+    "hint": "节点库、图、状态、心情都落这儿。留空就用框架给的数据目录 data/plugin_data/astrbot_plugin_llmemory，升级插件不碰它。想放别处就填一个插件目录外的绝对路径，填了记得把老库搬过去，不然会从空库起。"
   },
   "writer_dir": {
     "description": "人格和日记 · 存在哪",
     "type": "string",
     "default": "",
-    "hint": "留空就用插件自己的 plugin_data/memory。里面有 live/、diary/、hot.md、persona.md。"
+    "hint": "留空就用数据目录下的 memory。里面有 live/、diary/、hot.md、persona.md。"
   },
   "writer_provider": {
     "description": "人格和日记 · 用哪个模型",

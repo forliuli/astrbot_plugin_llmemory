@@ -14,8 +14,9 @@ import random
 import time
 
 from .nodes import NodeBook, mood_phrases, mood_hit
+from .paths import under as _under
 
-DEFAULT_PATH = os.path.join("plugin_data", "暗处", "muse.jsonl")
+DEFAULT_PATH = _under("暗处", "muse.jsonl")
 
 HOPS = 1                   # 一次扩散只带一颗：从起点沿边走一步，那一颗就是带出来的
 NIGHT_START, NIGHT_END = 23, 6

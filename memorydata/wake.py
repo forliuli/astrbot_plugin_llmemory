@@ -24,6 +24,7 @@ import time
 
 from . import muse as M
 from .nodes import load_book
+from .paths import under as _under
 
 from astrbot.api import logger
 
@@ -36,8 +37,8 @@ STRONG_SCALE = 1.6     # 走到的这颗，激活强度过了它才算强（|sca
 RECENT_NODES = 4       # 拼上下文时带最近几颗的原话
 MAX_SAY = 90           # 模型写多了就切
 
-STATE_NAME = os.path.join("plugin_data", "状态", "wake.json")
-TARGET_NAME = os.path.join("plugin_data", "状态", "wake_target.txt")
+STATE_NAME = _under("状态", "wake.json")
+TARGET_NAME = _under("状态", "wake_target.txt")
 
 SYSTEM = (
     "你正在和对方私聊。这会儿没人开口，你自己待着，"
@@ -93,7 +94,7 @@ class Waker:
     def __init__(self, plugin, nodes_path: str = "", muse_path: str = "",
                  state_path: str = ""):
         self.plugin = plugin
-        self.nodes_path = nodes_path or os.path.join("plugin_data", "nodes.json")
+        self.nodes_path = nodes_path or _under("nodes.json")
         self.muse_path = muse_path or M.DEFAULT_PATH
         self.state_path = state_path or STATE_NAME
         self.sent = []                              # 开口的时刻，跨重启留着

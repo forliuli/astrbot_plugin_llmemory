@@ -23,7 +23,9 @@ import threading
 import time
 import uuid
 
-DEFAULT_PATH = os.path.join("plugin_data", "nodes.json")   # 名字照旧，里面一行一颗
+from .paths import under as _under
+
+DEFAULT_PATH = _under("nodes.json")   # 名字照旧，里面一行一颗
 EDGE_WINDOW = 1800.0     # 半小时内落的节点算挨着
 MAX_EDGE = 8.0           # 一条边最多这么粗，再走也不更近
 EDGE_MIN = 1e-4          # 细到这个份上跟没有一样，压到就掐掉
