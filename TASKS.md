@@ -1,6 +1,6 @@
 # AstrBot 记忆插件 · 主任务
 
-工作区：`C:\Users\liuli\liuli_unpack\ws\projects\astrbot_plugin_llmemory`（目录名 11-24 改过，包目录为 memorydata）
+工作区：仓库根目录（包目录为 memorydata）
 建区：2026-11-23 13:45　改版：13:55（五模块定型）
 
 ---

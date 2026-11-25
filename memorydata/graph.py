@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """记忆库的图画层：近邻、边、检索、加固、衰减。
 
-从 记忆/技/hebb.py 原样搬来，只把「行号 + chunks.jsonl」换成「节点 id + NodeBook」。
+最初由一份脚本层原样搬来，只把「行号 + chunks.jsonl」换成「节点 id + NodeBook」。
 顺序和公式一条没改：
   建边   语义近邻（cosine >= min_sim，取 topk）+ 时间相邻（gap <= tmax）
   截度   每颗节点最多 max_deg 条，留最粗的

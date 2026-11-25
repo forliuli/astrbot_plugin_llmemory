@@ -140,7 +140,7 @@ def write_mood(state, judgement=None, out_path: str | None = None) -> str:
     PLUGIN_NAME,
     "",
     "情绪与内分泌层：把一句话判成五个事件之一，落到六维状态上，跨轮存盘。不接模型也能跑。",
-    "0.1.0",
+    "0.1.4",
     "",
 )
 def _speaker(event) -> str:
