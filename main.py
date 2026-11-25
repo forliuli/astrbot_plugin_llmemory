@@ -136,13 +136,6 @@ def write_mood(state, judgement=None, out_path: str | None = None) -> str:
     return line
 
 
-@register(
-    PLUGIN_NAME,
-    "",
-    "情绪与内分泌层：把一句话判成五个事件之一，落到六维状态上，跨轮存盘。不接模型也能跑。",
-    "0.1.4",
-    "",
-)
 def _speaker(event) -> str:
     """谁说的。取不到就空，别为一个名字崩。"""
     fn = getattr(event, "get_sender_name", None)
@@ -181,6 +174,13 @@ def _reply_text(resp) -> str:
     return str(text).strip()
 
 
+@register(
+    PLUGIN_NAME,
+    "",
+    "情绪与内分泌层：把一句话判成五个事件之一，落到六维状态上，跨轮存盘。不接模型也能跑。",
+    "0.1.7",
+    "",
+)
 class LlmemoryPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig | dict | None = None):
         super().__init__(context)
@@ -395,7 +395,7 @@ class LlmemoryPlugin(Star):
             if pid:
                 return await self.context.llm_generate(
                     chat_provider_id=pid, prompt=prompt, system_prompt=system)
-            prov = self.context.get_using_provider(self.last_umo) if self.last_umo else None
+            prov = self.context.get_using_provider(self.last_umo or None)
             if prov is None:
                 return ""
             resp = await prov.text_chat(prompt=prompt, system_prompt=system)

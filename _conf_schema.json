@@ -156,14 +156,14 @@
   "drift_enable": {
     "description": "神游",
     "type": "bool",
-    "default": false,
+    "default": true,
     "hint": "没事的时候自己顺着旧事走几步，把路上那几句记下来。只落盘，不当场说话。"
   },
   "wake_enable": {
     "description": "自唤醒",
     "type": "bool",
-    "default": false,
-    "hint": "从神游记下的那几句里挑一句，自己开口。默认关着，觉得话太少再开。"
+    "default": true,
+    "hint": "神游走到强激活节点时才自己开口。不看钟点，看走没走到够强的节点：走到了、又不在静默时段、这一小时的额度还没用完，才说一句；走到的是颗不响的，这一趟就算了。说出口的话由模型按那颗节点和最近几轮对话现写，不照抄轨迹原句。只发往最近说过话的会话，没有会话就等。默认关。"
   },
   "wake_quiet_start": {
     "description": "静默 · 从几点开始",
@@ -186,7 +186,8 @@
   "wake_fresh_minutes": {
     "description": "多新的碎片才拿来开口（分钟）",
     "type": "int",
-    "default": 240
+    "default": 240,
+    "hint": "碎片要多新才算数。比这个时长更旧的碎片不拿来开口，四小时前的旧事不当话头。10 到 1440 分钟。"
   },
   "wake_strong_scale": {
     "description": "神游 · 强激活线（激活强度）",

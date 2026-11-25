@@ -206,14 +206,6 @@ def avoid_set(path: str, n: int = 12) -> set:
     return starts
 
 
-def matches(item: dict, mood: str) -> bool:
-    """这条碎片跟当下的心情对不对得上。对得上才值得拿来说。"""
-    want = mood_phrases(mood)
-    if not want or not isinstance(item, dict):
-        return False
-    return bool(want & mood_phrases(item.get("line", "")))
-
-
 def run_once(book: NodeBook, path: str = "", mood: str = "",
              now_ts: float | None = None) -> dict | None:
     """一次完整的神游：走、拼、落。返回落下的那条，没走成给 None。"""

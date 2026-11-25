@@ -1,14 +1,15 @@
 """自唤醒。
 
 没人说话的时候它自己待着：隔一阵走一趟（神游），再看要不要开口。
-开口有门槛，门槛不够就不说——自唤醒不是定时报时。
+走和说是两道闸：drift_enable 管走，wake_enable 管说。
 
-1. 碎片得是这段时间新落的；
-2. 神游走到的那颗得是强激活的——分量、边、新旧算出来的分要排进全书前列，
-   跟当下心情对得上再抬一点；走到的是颗不响的节点，这一趟就算了；
-3. 静默时段不说，刚说过不说，一小时、一天都有数；
-4. 六维太沉的时候更少开口；
-5. 说出去的那句由模型写：强节点和最近几轮对话一起喂进去，
+说的门槛，一条不过就不说：
+1. 碎片得是刚落的（默认四小时内），过时的材料不拿来开口；
+2. 神游走到的那颗得够强：|激活强度| 过了门槛线（默认 1.6）才说；
+   说过的起点不再说，走到的是颗不响的节点，这一趟就算了；
+3. 静默时段不说，每小时说几条也有数；
+4. 心情沉的时候门槛抬高，太沉干脆不说；
+5. 说出去的那句由模型现写：强节点和最近几轮对话一起喂进去，
    神游拼的轨迹句只当材料，不原样发。
 
 只往最近说过话的那个会话发。没会话就等着，不猜。
@@ -110,7 +111,7 @@ class Waker:
         self.strong_scale = _num(raw, "wake_strong_scale", STRONG_SCALE, 0.1, 5.0)
         self.tick_seconds = _num(raw, "wake_drift_minutes", TICK / 60.0, 1.0, 1440.0) * 60.0
         self.drift_enable = bool(raw.get("drift_enable", True))
-        self.wake_enable = bool(raw.get("wake_enable", False))   # 走不走 ≠ 说不说
+        self.wake_enable = bool(raw.get("wake_enable", True))    # 走不走 ≠ 说不说
         self._load()
 
     # ---- 存 ------------------------------------------------------------
@@ -285,7 +286,6 @@ class Waker:
         """过模型再开口。没有模型入口就不说，绝不退回轨迹原句。"""
         gen = getattr(self.plugin, "_gen_text", None)
         if gen is None:
-            logger.warning("[llmemory] 自唤醒未配置模型，本轮跳过")
             return ""
         try:
             text = await gen(SYSTEM, self.brief(frag, node, book))
