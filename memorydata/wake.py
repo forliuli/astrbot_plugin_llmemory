@@ -25,11 +25,7 @@ import time
 from . import muse as M
 from .nodes import load_book
 
-try:
-    from astrbot.api import logger
-except Exception:                                   # 单独跑脚本时
-    import logging
-    logger = logging.getLogger("llmemory.wake")
+from astrbot.api import logger
 
 TICK = 60.0            # 多久醒一次（默认一分钟，面板可改）
 QUIET = (1, 7)         # 静默时段：凌晨一点到七点
