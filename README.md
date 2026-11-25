@@ -57,7 +57,7 @@ memorydata/
   recall.py           取回：入口节点 + 沿边走一跳
   writer.py           落库
   muse.py             神游
-  wake.py             自唤醒、长梦
+  wake.py             自唤醒
   reflect.py          反思
   model_fetch.py      向量模型下载（.part + sha256 + os.replace）
   affect/             六维情绪，规则判官与模型判官
