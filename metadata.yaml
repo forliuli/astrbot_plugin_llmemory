@@ -4,8 +4,8 @@ short_desc: 把一句话判成五个事件之一，落到六维状态上并跨�
 desc: 情绪与内分泌层。规则档判好话坏话（无模型也能判），六维状态按时间漂移、按事件推动，状态落盘跨轮延续，可选用一句话注入提示词。面板可调基线、回落快慢、推动强弱与侵蚀速度。记忆边按时间常数 τ 指数衰减，向量图与节点库分别处理，枢纽节点受保护，只降权不删节点。
 help: 默认全自动，不需要指令。/情绪 看一眼当前六维状态。面板里 judge_mode 选 rule 就不需要任何模型配置。
 version: v0.1.4
-author: ""
-repo: ""
+author: forliuli
+repo: https://github.com/forliuli/astrbot_plugin_llmemory
 astrbot_version: ">=4.16,<5"
 support_platforms:
   - aiocqhttp
