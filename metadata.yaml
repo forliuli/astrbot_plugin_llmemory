@@ -7,7 +7,7 @@ desc: "本地记忆插件。采用模拟神经激活的赫布学习向量库，�
   各模块能单独关，全关时对原来的对话零影响。部分使用 ai 制作。\
   如有问题可与我反馈，谢谢。"
 help: 默认全自动，不需要指令。/情绪 看一眼当前六维状态。面板里 judge_mode 选 rule 就不需要任何模型配置。
-version: v0.1.7
+version: v0.1.8
 author: forliuli
 repo: https://github.com/forliuli/astrbot_plugin_llmemory
 astrbot_version: ">=4.16,<5"
