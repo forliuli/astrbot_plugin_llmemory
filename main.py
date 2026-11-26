@@ -178,7 +178,7 @@ def _reply_text(resp) -> str:
     PLUGIN_NAME,
     "",
     "情绪与内分泌层：把一句话判成五个事件之一，落到六维状态上，跨轮存盘。不接模型也能跑。",
-    "0.1.7",
+    "0.1.8",
     "",
 )
 class LlmemoryPlugin(Star):
@@ -670,11 +670,14 @@ class LlmemoryPlugin(Star):
             say = _reply_text(resp)
             if not say or not umo:
                 return
-            pend = self._pending.get(umo)
+            pend = self._pending.pop(umo, None)
             if pend is None:
                 return
-            self._pending.pop(umo, None)
-            await eventloop_run(self._land, (pend, say))
+            try:
+                await eventloop_run(self._land, pend, say)
+            except BaseException:
+                self._pending.setdefault(umo, pend)   # 没落成就放回去，等下一轮兜底
+                raise
         except Exception as e:
             logger.warning(f"[llmemory] 本轮状态写入失败：{e}")
 
